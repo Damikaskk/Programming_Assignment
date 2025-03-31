@@ -1,0 +1,3 @@
+/Users/madat/CLionProjects/Programing Assigment/cmake-build-debug/CMakeFiles/Programing_Assigment.dir
+/Users/madat/CLionProjects/Programing Assigment/cmake-build-debug/CMakeFiles/edit_cache.dir
+/Users/madat/CLionProjects/Programing Assigment/cmake-build-debug/CMakeFiles/rebuild_cache.dir
