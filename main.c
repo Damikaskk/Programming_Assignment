@@ -23,6 +23,9 @@ void handleTransaction(Card *card);
 void showMenu();
 int withdrawMoney(Card *card);
 int depositMoney(Card *card);
+void printReceipt(Card *card, const char *transactionType, double amount, double oldBalance);
+int wantsReceipt();
+int isWeakPin(int pin);
 
 int main() {
     initializeDatabase();
@@ -35,6 +38,11 @@ int main() {
         scanf("%d", &cardId);
 
         if (cardId == 0) break;
+        if (cardId < 1 || cardId > 2) {
+            printf("Invalid Card ID. Only cards 1 and 2 are supported.\n");
+            continue;
+        }
+
         if (fetchCard(cardId, &currentCard) == 0) {
             printf("Card not found.\n");
             continue;
@@ -63,6 +71,7 @@ int main() {
             blockCard(cardId);
         }
     }
+
     return 0;
 }
 
@@ -125,6 +134,11 @@ void updateBalance(int cardId, double newBalance) {
 }
 
 void updatePin(int cardId, int newPin) {
+    if (isWeakPin(newPin)) {
+        printf("Error: PIN is too weak. Choose a stronger PIN.\n");
+        return;
+    }
+
     sqlite3 *db;
     char sql[100];
 
@@ -132,6 +146,7 @@ void updatePin(int cardId, int newPin) {
     sprintf(sql, "UPDATE ATM_Cards SET pin = %d WHERE id = %d", newPin, cardId);
     sqlite3_exec(db, sql, 0, 0, 0);
     sqlite3_close(db);
+    printf("PIN changed successfully.\n");
 }
 
 void blockCard(int cardId) {
@@ -197,9 +212,9 @@ void handleTransaction(Card *card) {
                 int newPin;
                 scanf("%d", &newPin);
                 updatePin(card->id, newPin);
-                printf("PIN changed successfully.\n");
                 break;
             case 5:
+                printf("Card ejected. Thank you!\n");
                 return;
             default:
                 printf("Invalid option.\n");
@@ -212,17 +227,28 @@ void showMenu() {
     printf("2. Withdraw Money\n");
     printf("3. Deposit Money\n");
     printf("4. Change PIN\n");
-    printf("5. Exit\n> ");
+    printf("5. Eject Card\n> ");
 }
 
 int withdrawMoney(Card *card) {
     double amount;
-    printf("Enter amount to withdraw: ");
+    printf("Enter amount to withdraw (must be divisible by 5, 10, or 20): ");
     scanf("%lf", &amount);
+
+    if ((int)amount % 5 != 0) {
+        printf("Error: Withdrawal amount must be divisible by 5, 10, or 20.\n");
+        return 0;
+    }
+
     if (amount > 0 && amount <= card->balance) {
+        double oldBalance = card->balance;
         card->balance -= amount;
         updateBalance(card->id, card->balance);
         printf("Withdrawal successful. New balance: £%.2f\n", card->balance);
+
+        if (wantsReceipt()) {
+            printReceipt(card, "Withdrawal", amount, oldBalance);
+        }
     } else {
         printf("Invalid amount.\n");
     }
@@ -233,10 +259,54 @@ int depositMoney(Card *card) {
     double amount;
     printf("Enter amount to deposit: ");
     scanf("%lf", &amount);
+
     if (amount > 0) {
+        double oldBalance = card->balance;
         card->balance += amount;
         updateBalance(card->id, card->balance);
         printf("Deposit successful. New balance: £%.2f\n", card->balance);
+
+        if (wantsReceipt()) {
+            printReceipt(card, "Deposit", amount, oldBalance);
+        }
     }
+    return 0;
+}
+
+void printReceipt(Card *card, const char *transactionType, double amount, double oldBalance) {
+    printf("\n--- Transaction Receipt ---\n");
+    printf("Card ID: %d\n", card->id);
+    printf("Owner: %s\n", card->ownerName);
+    printf("Transaction: %s\n", transactionType);
+    printf("Amount: £%.2f\n", amount);
+    printf("Old Balance: £%.2f\n", oldBalance);
+    printf("New Balance: £%.2f\n", card->balance);
+    printf("---------------------------\n");
+}
+
+int wantsReceipt() {
+    char response;
+    printf("Do you want to print a receipt? (y/n): ");
+    scanf(" %c", &response);
+    return (response == 'y' || response == 'Y');
+}
+
+int isWeakPin(int pin) {
+    const int weakPins[] = {
+        1234, 4321, 9876, 5432, 6789, 8765, 1111,
+        2222, 3333, 4444, 5555, 6666, 7777, 8888, 9999
+    };
+    int i;
+    for (i = 0; i < sizeof(weakPins) / sizeof(weakPins[0]); i++) {
+        if (pin == weakPins[i]) {
+            return 1;
+        }
+    }
+
+    int firstDigit = pin / 1000;
+    if (pin == firstDigit * 1111) {
+        return 1;
+    }
+
     return 0;
 }
