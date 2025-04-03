@@ -26,6 +26,7 @@ int depositMoney(Card *card);
 void printReceipt(Card *card, const char *transactionType, double amount, double oldBalance);
 int wantsReceipt();
 int isWeakPin(int pin);
+int isValidPin(int pin);
 
 int main() {
     initializeDatabase();
@@ -34,7 +35,7 @@ int main() {
     Card currentCard;
 
     while (1) {
-        printf("\nEnter Card ID (1 or 2, 0 to Exit): ");
+        printf("\nEnter Card ID (1 or 2, 0 to Exit):\n> ");
         scanf("%d", &cardId);
 
         if (cardId == 0) break;
@@ -56,7 +57,7 @@ int main() {
 
         attempts = 0;
         while (attempts < 3) {
-            printf("Enter PIN: ");
+            printf("Enter PIN:\n> ");
             scanf("%d", &enteredPin);
             if (enteredPin == currentCard.pin) {
                 handleTransaction(&currentCard);
@@ -134,6 +135,11 @@ void updateBalance(int cardId, double newBalance) {
 }
 
 void updatePin(int cardId, int newPin) {
+    if (!isValidPin(newPin)) {
+        printf("Error: PIN must be a 4-digit number.\n");
+        return;
+    }
+
     if (isWeakPin(newPin)) {
         printf("Error: PIN is too weak. Choose a stronger PIN.\n");
         return;
@@ -208,7 +214,7 @@ void handleTransaction(Card *card) {
                 depositMoney(card);
                 break;
             case 4:
-                printf("Enter new PIN: ");
+                printf("Enter new PIN :\n> ");
                 int newPin;
                 scanf("%d", &newPin);
                 updatePin(card->id, newPin);
@@ -232,7 +238,7 @@ void showMenu() {
 
 int withdrawMoney(Card *card) {
     double amount;
-    printf("Enter amount to withdraw (must be divisible by 5, 10, or 20): ");
+    printf("Enter amount to withdraw (must be divisible by 5, 10, or 20):\n> ");
     scanf("%lf", &amount);
 
     if ((int)amount % 5 != 0) {
@@ -257,7 +263,7 @@ int withdrawMoney(Card *card) {
 
 int depositMoney(Card *card) {
     double amount;
-    printf("Enter amount to deposit: ");
+    printf("Enter amount to deposit:\n> ");
     scanf("%lf", &amount);
 
     if (amount > 0) {
@@ -286,7 +292,7 @@ void printReceipt(Card *card, const char *transactionType, double amount, double
 
 int wantsReceipt() {
     char response;
-    printf("Do you want to print a receipt? (y/n): ");
+    printf("Do you want to print a receipt? (y/n):\n> ");
     scanf(" %c", &response);
     return (response == 'y' || response == 'Y');
 }
@@ -309,4 +315,8 @@ int isWeakPin(int pin) {
     }
 
     return 0;
+}
+
+int isValidPin(int pin) {
+    return pin >= 1000 && pin <= 9999;
 }
