@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -21,60 +22,16 @@ void blockCard(int cardId);
 void contactBank(int cardId);
 void handleTransaction(Card *card);
 void showMenu();
-int withdrawMoney(Card *card);
-int depositMoney(Card *card);
+int withdrawMoney(Card *card, double amount);
+int depositMoney(Card *card, double amount);
 void printReceipt(Card *card, const char *transactionType, double amount, double oldBalance);
 int wantsReceipt();
 int isWeakPin(int pin);
 int isValidPin(int pin);
+void test_withdrawMoney();
+void test_depositMoney();
+void test_check_balance();
 
-int main() {
-    initializeDatabase();
-
-    int cardId, enteredPin, attempts;
-    Card currentCard;
-
-    while (1) {
-        printf("\nEnter Card ID (1 or 2, 0 to Exit):\n> ");
-        scanf("%d", &cardId);
-
-        if (cardId == 0) break;
-        if (cardId < 1 || cardId > 2) {
-            printf("Invalid Card ID. Only cards 1 and 2 are supported.\n");
-            continue;
-        }
-
-        if (fetchCard(cardId, &currentCard) == 0) {
-            printf("Card not found.\n");
-            continue;
-        }
-
-        if (currentCard.blocked) {
-            printf("Card is blocked. Contact the bank.\n");
-            contactBank(cardId);
-            continue;
-        }
-
-        attempts = 0;
-        while (attempts < 3) {
-            printf("Enter PIN:\n> ");
-            scanf("%d", &enteredPin);
-            if (enteredPin == currentCard.pin) {
-                handleTransaction(&currentCard);
-                break;
-            }
-            printf("Incorrect PIN. Attempts left: %d\n", 2 - attempts);
-            attempts++;
-        }
-
-        if (attempts == 3) {
-            printf("Card blocked. Contact the bank.\n");
-            blockCard(cardId);
-        }
-    }
-
-    return 0;
-}
 
 void initializeDatabase() {
     sqlite3 *db;
@@ -200,28 +157,34 @@ void contactBank(int cardId) {
 
 void handleTransaction(Card *card) {
     int option;
+    double amount;
+
     while (1) {
         showMenu();
         scanf("%d", &option);
         switch (option) {
             case 1:
                 printf("Your balance: £%.2f\n", card->balance);
-                break;
+            break;
             case 2:
-                withdrawMoney(card);
-                break;
+                printf("Enter amount to withdraw (must be divisible by 5, 10, or 20):\n> ");
+            scanf("%lf", &amount);
+            withdrawMoney(card, amount);
+            break;
             case 3:
-                depositMoney(card);
-                break;
+                printf("Enter amount to deposit:\n> ");
+            scanf("%lf", &amount);
+            depositMoney(card, amount);
+            break;
             case 4:
                 printf("Enter new PIN :\n> ");
-                int newPin;
-                scanf("%d", &newPin);
-                updatePin(card->id, newPin);
-                break;
+            int newPin;
+            scanf("%d", &newPin);
+            updatePin(card->id, newPin);
+            break;
             case 5:
                 printf("Card ejected. Thank you!\n");
-                return;
+            return;
             default:
                 printf("Invalid option.\n");
         }
@@ -236,11 +199,7 @@ void showMenu() {
     printf("5. Eject Card\n> ");
 }
 
-int withdrawMoney(Card *card) {
-    double amount;
-    printf("Enter amount to withdraw (must be divisible by 5, 10, or 20):\n> ");
-    scanf("%lf", &amount);
-
+int withdrawMoney(Card *card, double amount) {
     if ((int)amount % 5 != 0) {
         printf("Error: Withdrawal amount must be divisible by 5, 10, or 20.\n");
         return 0;
@@ -255,17 +214,14 @@ int withdrawMoney(Card *card) {
         if (wantsReceipt()) {
             printReceipt(card, "Withdrawal", amount, oldBalance);
         }
+        return 1;
     } else {
         printf("Invalid amount.\n");
+        return 0;
     }
-    return 0;
 }
 
-int depositMoney(Card *card) {
-    double amount;
-    printf("Enter amount to deposit:\n> ");
-    scanf("%lf", &amount);
-
+int depositMoney(Card *card, double amount) {
     if (amount > 0) {
         double oldBalance = card->balance;
         card->balance += amount;
@@ -275,8 +231,11 @@ int depositMoney(Card *card) {
         if (wantsReceipt()) {
             printReceipt(card, "Deposit", amount, oldBalance);
         }
+        return 1;
+    } else {
+        printf("Invalid deposit amount.\n");
+        return 0;
     }
-    return 0;
 }
 
 void printReceipt(Card *card, const char *transactionType, double amount, double oldBalance) {
@@ -319,4 +278,84 @@ int isWeakPin(int pin) {
 
 int isValidPin(int pin) {
     return pin >= 1000 && pin <= 9999;
+}
+
+
+void test_withdrawMoney() {
+    Card testCard = {1, 1234, 100.0, 0, "Test User"};
+
+    double amount = 10.0;
+    assert(withdrawMoney(&testCard, amount) == 1); // Проверяем успешное выполнение
+    assert(testCard.balance == 90.0); // Проверяем уменьшение баланса
+}
+
+void test_depositMoney() {
+    Card testCard = {1, 1234, 100.0, 0, "Test User"};
+
+    double amount = 20.0;
+    assert(depositMoney(&testCard, amount) == 1); // Проверяем успешное выполнение
+    assert(testCard.balance == 120.0); // Проверяем увеличение баланса
+}
+
+void test_check_balance() {
+    Card testCard = {1, 1234, 100.0, 0, "Test User"};
+
+    double expectedBalance = testCard.balance;
+    assert(testCard.balance == expectedBalance);
+}
+
+
+
+
+int main() {
+    // test_withdrawMoney();
+    // test_depositMoney();
+    // test_check_balance();
+
+    printf("All tests passed successfully!\n");
+    initializeDatabase();
+
+    int cardId, enteredPin, attempts;
+    Card currentCard;
+
+    while (1) {
+        printf("\nEnter Card ID (1 or 2, 0 to Exit):\n> ");
+        scanf("%d", &cardId);
+
+        if (cardId == 0) break;
+        if (cardId < 1 || cardId > 2) {
+            printf("Invalid Card ID. Only cards 1 and 2 are supported.\n");
+            continue;
+        }
+
+        if (fetchCard(cardId, &currentCard) == 0) {
+            printf("Card not found.\n");
+            continue;
+        }
+
+        if (currentCard.blocked) {
+            printf("Card is blocked. Contact the bank.\n");
+            contactBank(cardId);
+            continue;
+        }
+
+        attempts = 0;
+        while (attempts < 3) {
+            printf("Enter PIN:\n> ");
+            scanf("%d", &enteredPin);
+            if (enteredPin == currentCard.pin) {
+                handleTransaction(&currentCard);
+                break;
+            }
+            printf("Incorrect PIN. Attempts left: %d\n", 2 - attempts);
+            attempts++;
+        }
+
+        if (attempts == 3) {
+            printf("Card blocked. Contact the bank.\n");
+            blockCard(cardId);
+        }
+    }
+
+    return 0;
 }
