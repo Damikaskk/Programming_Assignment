@@ -31,7 +31,12 @@ int isValidPin(int pin);
 void test_withdrawMoney();
 void test_depositMoney();
 void test_check_balance();
-
+void test_updatePin();
+void test_blockCard();
+void test_unblockCard();
+void test_fetchCard();
+void test_isWeakPin();
+void test_isValidPin();
 
 void initializeDatabase() {
     sqlite3 *db;
@@ -155,50 +160,6 @@ void contactBank(int cardId) {
     sqlite3_close(db);
 }
 
-void handleTransaction(Card *card) {
-    int option;
-    double amount;
-
-    while (1) {
-        showMenu();
-        scanf("%d", &option);
-        switch (option) {
-            case 1:
-                printf("Your balance: £%.2f\n", card->balance);
-            break;
-            case 2:
-                printf("Enter amount to withdraw (must be divisible by 5, 10, or 20):\n> ");
-            scanf("%lf", &amount);
-            withdrawMoney(card, amount);
-            break;
-            case 3:
-                printf("Enter amount to deposit:\n> ");
-            scanf("%lf", &amount);
-            depositMoney(card, amount);
-            break;
-            case 4:
-                printf("Enter new PIN :\n> ");
-            int newPin;
-            scanf("%d", &newPin);
-            updatePin(card->id, newPin);
-            break;
-            case 5:
-                printf("Card ejected. Thank you!\n");
-            return;
-            default:
-                printf("Invalid option.\n");
-        }
-    }
-}
-
-void showMenu() {
-    printf("\n1. Check Balance\n");
-    printf("2. Withdraw Money\n");
-    printf("3. Deposit Money\n");
-    printf("4. Change PIN\n");
-    printf("5. Eject Card\n> ");
-}
-
 int withdrawMoney(Card *card, double amount) {
     if ((int)amount % 5 != 0) {
         printf("Error: Withdrawal amount must be divisible by 5, 10, or 20.\n");
@@ -216,7 +177,7 @@ int withdrawMoney(Card *card, double amount) {
         }
         return 1;
     } else {
-        printf("Invalid amount.\n");
+        printf("Insufficient funds.\n");
         return 0;
     }
 }
@@ -257,6 +218,8 @@ int wantsReceipt() {
 }
 
 int isWeakPin(int pin) {
+    if (pin == 0) return 1; // запрещаем 0000
+
     const int weakPins[] = {
         1234, 4321, 9876, 5432, 6789, 8765, 1111,
         2222, 3333, 4444, 5555, 6666, 7777, 8888, 9999
@@ -277,40 +240,138 @@ int isWeakPin(int pin) {
 }
 
 int isValidPin(int pin) {
-    return pin >= 1000 && pin <= 9999;
+    return pin >= 0 && pin <= 9999;
 }
 
+void handleTransaction(Card *card) {
+    int option;
+    double amount;
+
+    while (1) {
+        showMenu();
+        if (scanf("%d", &option) != 1) {
+            printf("Invalid transaction.\n");
+            while (getchar() != '\n');
+            continue;
+        }
+
+        switch (option) {
+            case 1:
+                printf("Your balance: £%.2f\n", card->balance);
+                break;
+            case 2:
+                printf("Enter amount to withdraw (must be divisible by 5, 10, or 20):\n> ");
+                if (scanf("%lf", &amount) != 1) {
+                    printf("Invalid transaction.\n");
+                    while (getchar() != '\n');
+                    continue;
+                }
+                withdrawMoney(card, amount);
+                break;
+            case 3:
+                printf("Enter amount to deposit:\n> ");
+                if (scanf("%lf", &amount) != 1) {
+                    printf("Invalid transaction.\n");
+                    while (getchar() != '\n');
+                    continue;
+                }
+                depositMoney(card, amount);
+                break;
+            case 4:
+                printf("Enter new PIN :\n> ");
+                int newPin;
+                if (scanf("%d", &newPin) != 1) {
+                    printf("Invalid transaction.\n");
+                    while (getchar() != '\n');
+                    continue;
+                }
+                updatePin(card->id, newPin);
+                break;
+            case 5:
+                printf("Card ejected. Thank you!\n");
+                return;
+            default:
+                printf("Invalid option.\n");
+        }
+    }
+}
+
+void showMenu() {
+    printf("\n1. Check Balance\n");
+    printf("2. Withdraw Money\n");
+    printf("3. Deposit Money\n");
+    printf("4. Change PIN\n");
+    printf("5. Eject Card\n> ");
+}
 
 void test_withdrawMoney() {
     Card testCard = {1, 1234, 100.0, 0, "Test User"};
-
     double amount = 10.0;
-    assert(withdrawMoney(&testCard, amount) == 1); // Проверяем успешное выполнение
-    assert(testCard.balance == 90.0); // Проверяем уменьшение баланса
+    assert(withdrawMoney(&testCard, amount) == 1);
+    assert(testCard.balance == 90.0);
 }
 
 void test_depositMoney() {
     Card testCard = {1, 1234, 100.0, 0, "Test User"};
-
     double amount = 20.0;
-    assert(depositMoney(&testCard, amount) == 1); // Проверяем успешное выполнение
-    assert(testCard.balance == 120.0); // Проверяем увеличение баланса
+    assert(depositMoney(&testCard, amount) == 1);
+    assert(testCard.balance == 120.0);
 }
 
 void test_check_balance() {
     Card testCard = {1, 1234, 100.0, 0, "Test User"};
-
     double expectedBalance = testCard.balance;
     assert(testCard.balance == expectedBalance);
 }
 
+void test_updatePin() {
+    Card testCard = {1, 1234, 100.0, 0, "Test User"};
+    int newPin = 5678;
+    updatePin(testCard.id, newPin);
+    assert(testCard.pin == 5678);
+}
 
+void test_blockCard() {
+    Card testCard = {1, 1234, 100.0, 0, "Test User"};
+    blockCard(testCard.id);
+    assert(testCard.blocked == 1);
+}
 
+void test_unblockCard() {
+    Card testCard = {1, 1234, 100.0, 1, "Test User"};
+    contactBank(testCard.id); // Assuming contactBank successfully unblocks the card
+    assert(testCard.blocked == 0);
+}
+
+void test_fetchCard() {
+    Card testCard;
+    int result = fetchCard(1, &testCard);
+    assert(result == 1); // Assuming card 1 exists in the database
+    assert(testCard.id == 1);
+}
+
+void test_isWeakPin() {
+    assert(isWeakPin(1234) == 1); // Weak PIN
+    assert(isWeakPin(5678) == 0); // Strong PIN
+    assert(isWeakPin(0) == 1);    // Also weak
+}
+
+void test_isValidPin() {
+    assert(isValidPin(1234) == 1); // Valid PIN
+    assert(isValidPin(99999) == 0); // Invalid PIN
+    assert(isValidPin(0) == 1);     // Valid but weak
+}
 
 int main() {
     // test_withdrawMoney();
     // test_depositMoney();
     // test_check_balance();
+    // test_updatePin();
+    // test_blockCard();
+    // test_unblockCard();
+    // test_fetchCard();
+    // test_isWeakPin();
+    // test_isValidPin();
 
     printf("All tests passed successfully!\n");
     initializeDatabase();
@@ -320,7 +381,11 @@ int main() {
 
     while (1) {
         printf("\nEnter Card ID (1 or 2, 0 to Exit):\n> ");
-        scanf("%d", &cardId);
+        if (scanf("%d", &cardId) != 1) {
+            printf("Invalid transaction.\n");
+            while (getchar() != '\n');
+            continue;
+        }
 
         if (cardId == 0) break;
         if (cardId < 1 || cardId > 2) {
@@ -342,7 +407,12 @@ int main() {
         attempts = 0;
         while (attempts < 3) {
             printf("Enter PIN:\n> ");
-            scanf("%d", &enteredPin);
+            if (scanf("%d", &enteredPin) != 1) {
+                printf("Invalid transaction.\n");
+                while (getchar() != '\n');
+                continue;
+            }
+
             if (enteredPin == currentCard.pin) {
                 handleTransaction(&currentCard);
                 break;
